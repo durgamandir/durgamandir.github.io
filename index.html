@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>श्री श्री 108 दुर्गा पूजा समिति, नयागाँव</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav><div class="wrap">
+  <a href="#home">मुख्य पृष्ठ</a><a href="#meeting">आगामी बैठक</a><a href="#calendar">पूजा कैलेंडर</a><a href="#members">समिति सदस्य</a><a href="#contact">संपर्क</a>
+</div></nav>
+
+<header class="wrap hero" id="home">
+  <div class="frame">
+    <small>॥ जय माँ दुर्गा ॥</small>
+    <h1 id="name">श्री श्री 108 दुर्गा पूजा समिति</h1>
+    <div class="place" id="place">नयागाँव</div>
+    <div class="dates" id="dates"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="meeting"><h2>आगामी बैठक</h2><div id="meetings"></div></section>
+  <section id="calendar"><h2>दुर्गा पूजा कैलेंडर</h2><div class="card calbox"><div id="cal"></div><div class="dayinfo" id="dayInfo"></div></div><div id="events"></div></section>
+  <section id="members"><h2>समिति के सदस्य</h2><div class="grid" id="memberList"></div></section>
+</main>
+
+<footer id="contact"><div class="wrap">
+  <h3>संपर्क</h3>
+  <p id="about"></p>
+  <p id="addr"></p>
+  <p>© श्री श्री 108 दुर्गा पूजा समिति, नयागाँव</p>
+</div></footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const t = todayStr();
+let MT = [], EV = [], sel = null, cm = new Date(); cm.setDate(1);
+function drawCal() {
+  const y = cm.getFullYear(), m = cm.getMonth(), first = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate();
+  const key = d => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  let h = `<div class="calhead"><button class="btn ghost" id="pm" aria-label="पिछला महीना">‹</button><h3>${cm.toLocaleDateString('hi-IN', {month:'long', year:'numeric'})}</h3><button class="btn ghost" id="nm" aria-label="अगला महीना">›</button></div><div class="calgrid">`
+    + ['रवि','सोम','मंगल','बुध','गुरु','शुक्र','शनि'].map(d => `<div class="dow">${d}</div>`).join('') + '<div></div>'.repeat(first);
+  for (let d = 1; d <= n; d++) {
+    const k = key(d), e = EV.some(x => x.date === k), mt = MT.some(x => x.date === k);
+    h += `<button class="day ${k === t ? 'today' : ''} ${k === sel ? 'sel' : ''}" data-k="${k}">${d}<i>${e ? '<b></b>' : ''}${mt ? '<b class="m"></b>' : ''}</i></button>`;
+  }
+  $('cal').innerHTML = h + '</div><div class="legend"><b></b>कार्यक्रम<b class="m"></b>बैठक</div>';
+  $('pm').onclick = () => { cm.setMonth(cm.getMonth() - 1); sel = null; drawCal(); };
+  $('nm').onclick = () => { cm.setMonth(cm.getMonth() + 1); sel = null; drawCal(); };
+  document.querySelectorAll('.day').forEach(b => b.onclick = () => { sel = b.dataset.k; drawCal(); });
+  if (!sel) { $('dayInfo').innerHTML = ''; return; }
+  const items = [...EV.filter(x => x.date === sel).map(x => ({...x, kind:'कार्यक्रम'})), ...MT.filter(x => x.date === sel).map(x => ({...x, kind:'बैठक'}))];
+  $('dayInfo').innerHTML = `<div class="meta" style="margin-bottom:6px">${fmtDate(sel)}</div>` + (items.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="meta">(${x.kind})</span>
+    <div class="meta">${x.time ? esc(x.time) : ''}${x.place ? ' • ' + esc(x.place) : ''}</div>${(x.desc || x.agenda) ? `<div>${esc(x.desc || x.agenda)}</div>` : ''}</div>`).join('') || '<p class="empty">इस दिन कोई कार्यक्रम या बैठक नहीं है।</p>');
+}
+drawCal();
+const fail = id => $(id).innerHTML = '<p class="empty">जानकारी लोड नहीं हो सकी। कृपया बाद में प्रयास करें।</p>';
+
+db.doc('settings/main').get().then(s => {
+  const d = s.data(); if (!d) return;
+  if (d.name) { $('name').textContent = d.name; document.title = d.name; }
+  if (d.place) $('place').textContent = d.place;
+  if (d.dates) $('dates').textContent = d.dates;
+  if (d.about) $('about').textContent = d.about;
+  const c = [d.address, d.phone && ('फोन: ' + d.phone)].filter(Boolean).join(' | ');
+  if (c) $('addr').textContent = c;
+}).catch(() => {});
+
+db.collection('meetings').orderBy('date').get().then(s => {
+  MT = s.docs.map(d => d.data()); drawCal();
+  const r = MT.filter(m => m.date >= t);
+  $('meetings').innerHTML = r.map(m => `<div class="card meet"><h3>${esc(m.title)}</h3>
+    <div class="meta">${fmtDate(m.date)}${m.time ? ' • ' + esc(m.time) : ''}${m.place ? ' • ' + esc(m.place) : ''}</div>
+    ${m.agenda ? `<p>${esc(m.agenda)}</p>` : ''}</div>`).join('') || '<p class="empty">अभी कोई बैठक निर्धारित नहीं है।</p>';
+}).catch(() => fail('meetings'));
+
+db.collection('events').orderBy('date').get().then(s => {
+  const r = s.docs.map(d => d.data()); EV = r; drawCal();
+  $('events').innerHTML = r.map(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    return `<div class="card ev ${e.date < t ? 'past' : ''}">
+      <div class="badge"><b>${d.getDate()}</b><span>${d.toLocaleDateString('hi-IN', {month:'short'})}</span></div>
+      <div><h3>${esc(e.title)}</h3><div class="meta">${fmtDate(e.date)}${e.time ? ' • ' + esc(e.time) : ''}</div>
+      ${e.desc ? `<p>${esc(e.desc)}</p>` : ''}</div></div>`;
+  }).join('') || '<p class="empty">कार्यक्रमों की सूची जल्द ही जोड़ी जाएगी।</p>';
+}).catch(() => fail('events'));
+
+db.collection('members').orderBy('order').get().then(s => {
+  $('memberList').innerHTML = s.docs.map(x => x.data()).map(m => `<div class="card mem">
+    ${m.photo ? `<img class="ph" src="${esc(m.photo)}" alt="${esc(m.name)}" loading="lazy">` : `<div class="ph">${esc((m.name || '').charAt(0))}</div>`}
+    <b>${esc(m.name)}</b><span class="meta">${esc(m.post)}</span>
+    ${m.phone ? `<div><a href="tel:${esc(m.phone)}">${esc(m.phone)}</a></div>` : ''}</div>`).join('')
+    || '<p class="empty">सदस्यों की सूची जल्द ही जोड़ी जाएगी।</p>';
+}).catch(() => fail('memberList'));
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>एडमिन पैनल | दुर्गा पूजा समिति</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="login card" id="login">
+    <h2 style="margin-bottom:16px">एडमिन लॉगिन</h2>
+    <form id="loginForm">
+      <label>ईमेल<input type="email" id="em" required></label>
+      <label>पासवर्ड<input type="password" id="pw" required></label>
+      <p id="lerr" style="color:var(--red)"></p>
+      <button class="btn">लॉगिन करें</button>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <div class="top"><h2>एडमिन पैनल</h2><div><a href="index.html" target="_blank">वेबसाइट देखें</a> &nbsp; <button class="btn ghost" id="out">लॉगआउट</button></div></div>
+    <div class="tabs">
+      <button class="btn" data-tab="settings">समिति की जानकारी</button>
+      <button class="btn" data-tab="meetings">बैठकें</button>
+      <button class="btn" data-tab="events">कार्यक्रम</button>
+      <button class="btn" data-tab="members">सदस्य</button>
+    </div>
+    <div id="panel"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const S = [['name','समिति का नाम','text'],['place','स्थान','text'],['dates','पूजा की तारीखें (जैसे: 17–21 अक्टूबर 2026)','text'],['address','पता','text'],['phone','संपर्क नंबर','tel'],['about','समिति के बारे में','textarea']];
+const C = {
+  meetings:{t:'बैठकें', order:'date', f:[['title','बैठक का विषय','text'],['date','तारीख','date'],['time','समय','time'],['place','स्थान','text'],['agenda','एजेंडा / विवरण','textarea']]},
+  events:{t:'कार्यक्रम', order:'date', f:[['title','कार्यक्रम का नाम','text'],['date','तारीख','date'],['time','समय','time'],['desc','विवरण','textarea']]},
+  members:{t:'सदस्य', order:'order', f:[['name','नाम','text'],['post','पद','text'],['phone','मोबाइल नंबर','tel'],['order','क्रम (छोटी संख्या पहले दिखेगी)','number'],['photo','फोटो','file']]}
+};
+const shrink = file => new Promise((ok, no) => {
+  const img = new Image();
+  img.onload = () => {
+    const z = 240, c = document.createElement('canvas'); c.width = c.height = z;
+    const side = Math.min(img.width, img.height);
+    c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, z, z);
+    ok(c.toDataURL('image/jpeg', 0.8));
+  };
+  img.onerror = no;
+  img.src = URL.createObjectURL(file);
+});
+let tab = 'settings', editId = null;
+
+const toast = m => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2800); };
+const field = ([k,l,t], v='') =>
+  t === 'textarea' ? `<label>${l}<textarea name="${k}" rows="3">${esc(v)}</textarea></label>`
+  : t === 'file' ? `<label>${l}<input type="file" name="${k}" accept="image/*"></label>`
+  : `<label>${l}<input type="${t}" name="${k}" value="${esc(v)}" ${t==='date'||k==='title'||k==='name'?'required':''}></label>`;
+
+auth.onAuthStateChanged(u => { $('login').hidden = !!u; $('app').hidden = !u; if (u) show('settings'); });
+$('loginForm').onsubmit = async e => {
+  e.preventDefault();
+  try { await auth.signInWithEmailAndPassword($('em').value, $('pw').value); }
+  catch { $('lerr').textContent = 'ईमेल या पासवर्ड गलत है।'; }
+};
+$('out').onclick = () => auth.signOut();
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => show(b.dataset.tab));
+
+async function show(t) {
+  tab = t; editId = null;
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (t !== 'settings') return renderList();
+  const d = (await db.doc('settings/main').get()).data() || {};
+  $('panel').innerHTML = `<form id="f" class="card">${S.map(x => field(x, d[x[0]])).join('')}<button class="btn">सहेजें</button></form>`;
+  $('f').onsubmit = async e => {
+    e.preventDefault();
+    await db.doc('settings/main').set(Object.fromEntries(new FormData(e.target)));
+    toast('जानकारी सहेज ली गई');
+  };
+}
+
+async function renderList() {
+  const c = C[tab];
+  const snap = await db.collection(tab).orderBy(c.order).get();
+  const rows = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  const cur = rows.find(r => r.id === editId) || {};
+  $('panel').innerHTML = `<form id="f" class="card"><h3 style="margin-bottom:12px">${editId ? 'बदलाव करें' : 'नया जोड़ें'}</h3>
+    ${c.f.map(x => field(x, cur[x[0]])).join('')}
+    ${cur.photo ? '<p class="meta">फोटो पहले से जुड़ी है। नई चुनने पर बदल जाएगी।</p>' : ''}
+    <div class="row"><button class="btn">सहेजें</button>${editId ? '<button type="button" class="btn ghost" id="cx">रद्द करें</button>' : ''}</div></form>
+    <div>${rows.map(r => `<div class="item"><div><b>${esc(r.title || r.name)}</b><br><small>${esc(r.date ? fmtDate(r.date) : r.post || '')}</small></div>
+      <div><button class="btn ghost" data-e="${r.id}">बदलें</button> <button class="btn danger" data-d="${r.id}">हटाएँ</button></div></div>`).join('') || '<p class="empty">अभी कुछ नहीं जोड़ा गया।</p>'}</div>`;
+
+  $('f').onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target), data = {};
+    for (const [k,, t] of c.f) {
+      if (t === 'file') {
+        const file = fd.get(k);
+        if (file && file.size) {
+          try { data.photo = await shrink(file); }
+          catch { return toast('फोटो पढ़ी नहीं जा सकी — कोई दूसरी फोटो चुनें।'); }
+        } else if (cur.photo) data.photo = cur.photo;
+      } else data[k] = t === 'number' ? Number(fd.get(k) || 0) : fd.get(k);
+    }
+    editId ? await db.collection(tab).doc(editId).set(data) : await db.collection(tab).add(data);
+    toast('सहेज लिया गया'); editId = null; renderList();
+  };
+  if ($('cx')) $('cx').onclick = () => { editId = null; renderList(); };
+  document.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { editId = b.dataset.e; renderList(); scrollTo(0, 0); });
+  document.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+    if (!confirm('क्या आप इसे हटाना चाहते हैं?')) return;
+    const r = rows.find(x => x.id === b.dataset.d);
+    await db.collection(tab).doc(r.id).delete();
+    toast('हटा दिया गया'); renderList();
+  });
+}
+</script>
+</body>
+</html>
