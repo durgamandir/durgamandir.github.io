@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>चंदा एडमिन</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .ad { max-width: 520px; margin: 16px auto 40px; padding: 0 14px; font-family: 'Noto Sans Devanagari', sans-serif; color: #2b1a14; }
+    .ad h2 { font-family: 'Tiro Devanagari Hindi', serif; font-weight: 400; color: #6b1020; margin: 0 0 10px; }
+    .ad input { width: 100%; box-sizing: border-box; padding: 11px; margin: 4px 0 8px; border: 1.5px solid #cdb9a8; border-radius: 8px; font: inherit; background: #fff; }
+    .ad input:focus-visible, .ad button:focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+    .pane { background: #fff; border: 1px solid #e3d3c3; border-radius: 12px; padding: 18px; }
+    .btn2 { padding: 11px 16px; border: 0; border-radius: 8px; background: #6b1020; color: #fff; font: 600 1rem 'Noto Sans Devanagari', sans-serif; cursor: pointer; }
+    .btn2.alt { background: transparent; color: #6b1020; border: 1.5px solid #6b1020; padding: 8px 12px; font-size: .9rem; }
+    .btn2.ok { background: #1f7a3d; }
+    .btn2:disabled { opacity: .6; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .top b { font-size: 1.35rem; color: #6b1020; }
+    .sub { color: #6d5a52; font-size: .9rem; }
+    .tabs { display: flex; gap: 8px; margin: 4px 0 12px; }
+    .tabs button { flex: 1; padding: 10px; border: 1.5px solid #6b1020; border-radius: 8px; background: #fff; color: #6b1020; font: 600 .95rem 'Noto Sans Devanagari', sans-serif; cursor: pointer; }
+    .tabs button.on { background: #6b1020; color: #fff; }
+    .item { background: #fff; border: 1px solid #e3d3c3; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .item .nm { font-weight: 600; font-size: 1.05rem; }
+    .item .meta { color: #6d5a52; font-size: .88rem; margin: 2px 0; }
+    .item .meta a { color: inherit; }
+    .pay { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+    .pay input { margin: 0; flex: 1; }
+    .paidamt { font-weight: 600; color: #1f7a3d; margin-top: 6px; }
+    .err { color: #b3261e; font-size: .9rem; min-height: 1.2em; }
+    .hide { display: none !important; }
+    .empty { text-align: center; color: #6d5a52; padding: 20px 0; }
+  </style>
+</head>
+<body>
+  <nav><div class="wrap">
+    <a href="index.html">मुख्य पृष्ठ</a>
+  </div></nav>
+
+  <main class="ad">
+    <section id="login" class="pane hide">
+      <h2>चंदा एडमिन</h2>
+      <form id="lf">
+        <input id="em" type="email" autocomplete="username" placeholder="एडमिन ईमेल" required>
+        <input id="pw" type="password" autocomplete="current-password" placeholder="पासवर्ड" required>
+        <p class="err" id="lerr" role="alert"></p>
+        <button class="btn2" type="submit">लॉगिन</button>
+      </form>
+    </section>
+
+    <section id="panel" class="hide">
+      <div class="top">
+        <div><b id="total">0</b><div class="sub" id="count"></div></div>
+        <button class="btn2 alt" id="out" type="button">लॉग आउट</button>
+      </div>
+      <input id="q" type="search" placeholder="नाम, मोबाइल या रसीद संख्या खोजें">
+      <div class="tabs">
+        <button type="button" data-t="pending" class="on">भुगतान बाकी</button>
+        <button type="button" data-t="paid">चंदा प्राप्त</button>
+      </div>
+      <div id="list"></div>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script>
+    const el = id => document.getElementById(id);
+    const safe = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const when = v => v && v.toDate ? v.toDate().toLocaleString('hi-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    let ALL = [], tab = 'pending', unsub = null;
+
+    firebase.auth().onAuthStateChanged(u => {
+      if (unsub) { unsub(); unsub = null; }
+      el('login').classList.toggle('hide', !!u);
+      el('panel').classList.toggle('hide', !u);
+      if (!u) return;
+      unsub = db.collection('chanda').orderBy('createdAt', 'desc').limit(300).onSnapshot(s => {
+        ALL = s.docs.map(d => Object.assign({ id: d.id }, d.data()));
+        draw();
+      }, e => {
+        console.error(e);
+        el('list').innerHTML = '<p class="empty">डेटा नहीं मिला (' + safe(e.code) + '). Firestore rules जाँचें।</p>';
+      });
+    });
+
+    el('lf').onsubmit = e => {
+      e.preventDefault();
+      el('lerr').textContent = '';
+      firebase.auth().signInWithEmailAndPassword(el('em').value.trim(), el('pw').value)
+        .catch(() => { el('lerr').textContent = 'लॉगिन नहीं हुआ। ईमेल या पासवर्ड जाँचें।'; });
+    };
+    el('out').onclick = () => firebase.auth().signOut();
+    el('q').oninput = () => draw();
+    document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+      tab = b.dataset.t;
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+      draw();
+    });
+
+    function draw() {
+      const paid = ALL.filter(x => x.status === 'paid');
+      el('total').textContent = '' + paid.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      el('count').textContent = paid.length + ' चंदा प्राप्त • ' + (ALL.length - paid.length) + ' बाकी';
+      const q = el('q').value.trim().toLowerCase();
+      const rows = ALL.filter(x => (x.status === 'paid') === (tab === 'paid')
+        && (!q || [x.name, x.mobile, x.receipt].join(' ').toLowerCase().includes(q)));
+      el('list').innerHTML = rows.map(x => {
+        const head = '<div class="nm">' + safe(x.name) + '</div>'
+          + '<div class="meta"><a href="tel:' + safe(x.mobile) + '">' + safe(x.mobile) + '</a> • ' + safe(x.receipt) + '</div>';
+        if (x.status === 'paid') {
+          return '<div class="item">' + head + '<div class="paidamt">✔ ₹' + safe(x.amount) + ' • ' + when(x.paidAt) + '</div></div>';
+        }
+        return '<div class="item">' + head + '<div class="meta">अनुरोध: ' + when(x.createdAt) + '</div>'
+          + '<div class="pay"><input type="number" inputmode="numeric" min="1" id="a_' + safe(x.id) + '" value="' + (Number(x.amount) || '') + '" placeholder="राशि ₹" aria-label="मिली हुई राशि">'
+          + '<button class="btn2 ok paybtn" type="button" data-id="' + safe(x.id) + '">Paid ✔</button></div></div>';
+      }).join('') || '<p class="empty">कोई नहीं मिला।</p>';
+    }
+
+    el('list').onclick = e => {
+      const b = e.target.closest('.paybtn'); if (!b) return;
+      const id = b.dataset.id, x = ALL.find(r => r.id === id);
+      const amt = Math.round(Number(el('a_' + id).value));
+      if (!x || !(amt >= 1)) return alert('मिली हुई राशि लिखें।');
+      if (!confirm(x.name + ' से ₹' + amt + ' प्राप्त हुआ? Paid करें?')) return;
+      b.disabled = true;
+      db.collection('chanda').doc(id).update({
+        status: 'paid', amount: amt, paidAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(err => { alert('सेव नहीं हुआ: ' + err.code); b.disabled = false; });
+    };
+  </script>
+</body>
+</html>

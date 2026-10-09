@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>चंदा दें</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .ch { max-width: 420px; margin: 18px auto 40px; padding: 0 14px; font-family: 'Noto Sans Devanagari', sans-serif; color: #2b1a14; }
+    .ch h2 { font-family: 'Tiro Devanagari Hindi', serif; font-weight: 400; font-size: 1.5rem; margin: 0 0 4px; color: #6b1020; }
+    .ch .sub { margin: 0 0 14px; color: #6d5a52; font-size: .95rem; }
+    .ch label { display: block; text-align: left; font-weight: 600; font-size: .9rem; margin-top: 10px; }
+    .ch input { width: 100%; box-sizing: border-box; padding: 12px; margin-top: 4px; border: 1.5px solid #cdb9a8; border-radius: 8px; font: inherit; background: #fff; }
+    .ch input:focus-visible, .cbtn:focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+    .cbtn { display: block; width: 100%; box-sizing: border-box; margin-top: 14px; padding: 13px; border: 0; border-radius: 8px; background: #6b1020; color: #fff; font: 600 1rem 'Noto Sans Devanagari', sans-serif; text-align: center; text-decoration: none; cursor: pointer; }
+    .cbtn.alt { background: transparent; color: #6b1020; border: 1.5px solid #6b1020; }
+    .cbtn.link { background: none; color: #6d5a52; font-weight: 400; font-size: .9rem; text-decoration: underline; padding: 8px; }
+    .err { color: #b3261e; font-size: .9rem; min-height: 1.2em; margin: 8px 0 0; }
+    .pane { background: #fff; border: 1px solid #e3d3c3; border-radius: 12px; padding: 18px; text-align: center; }
+    #qr { display: inline-block; padding: 10px; background: #fff; border: 2px solid #f2a900; border-radius: 10px; margin: 12px 0 6px; }
+    #qr img, #qr canvas { display: block; }
+    .ref { font-size: .9rem; color: #6d5a52; }
+    .ref b { color: #2b1a14; letter-spacing: .04em; }
+    .wait { font-size: .85rem; color: #6d5a52; margin-top: 12px; }
+
+    /* receipt slip */
+    .slipwrap { background: #f2a900; padding: 5px; border-radius: 9px; margin: 6px 0; }
+    .slip { background: #fffefb; border: 3px double #6b1020; border-radius: 6px; padding: 18px 16px 16px; text-align: center; }
+    .slip .puja { font-family: 'Tiro Devanagari Hindi', serif; font-size: 1.3rem; color: #6b1020; line-height: 1.35; margin: 0; }
+    .slip .stamp { display: inline-block; margin: 12px 0; padding: 5px 16px; border: 2px solid #1f7a3d; color: #1f7a3d; border-radius: 6px; font-weight: 600; transform: rotate(-3deg); }
+    .slip dl { margin: 6px 0 0; padding-top: 12px; border-top: 2px dashed #cdb9a8; text-align: left; }
+    .slip .row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid #efe3d6; }
+    .slip dt { color: #6d5a52; }
+    .slip dd { margin: 0; font-weight: 600; text-align: right; word-break: break-word; }
+    .slip .rno { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+    .hide { display: none !important; }
+    @media print { nav, .noprint { display: none !important; } }
+  </style>
+</head>
+<body>
+  <nav><div class="wrap">
+    <a href="index.html">मुख्य पृष्ठ</a>
+  </div></nav>
+
+  <main class="ch">
+    <!-- 1. नाम और मोबाइल -->
+    <section id="vForm" class="pane hide">
+      <h2>चंदा दें</h2>
+      <p class="sub">श्री श्री 108 दुर्गा पूजा, नयागाँव</p>
+      <form id="f" novalidate>
+        <label for="nm">आपका नाम</label>
+        <input id="nm" autocomplete="name" maxlength="60">
+        <label for="mb">मोबाइल नंबर</label>
+        <input id="mb" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" placeholder="10 अंकों का नंबर">
+        <label for="am">चंदे की राशि ₹</label>
+        <input id="am" type="number" inputmode="numeric" min="1" max="500000" step="1" placeholder="जैसे 101">
+        <p class="err" id="err" role="alert"></p>
+        <button class="cbtn" type="submit">भुगतान के लिए आगे बढ़ें</button>
+      </form>
+    </section>
+
+    <!-- 2. QR से भुगतान -->
+    <section id="vPay" class="pane hide">
+      <h2>चंदा भुगतान</h2>
+      <p class="sub" id="who"></p>
+      <div id="qr" aria-label="भुगतान के लिए QR कोड"></div>
+      <p class="ref">रसीद संख्या: <b id="ref"></b></p>
+      <p class="err" id="saveErr" role="alert"></p>
+      <a class="cbtn" id="payLink" href="#">UPI ऐप में भुगतान करें</a>
+      <p class="wait">भुगतान की पुष्टि होते ही यहाँ रसीद अपने आप दिख जाएगी। पेज बंद करके बाद में भी खोल सकते हैं।</p>
+      <button class="cbtn link reset" type="button">नाम या मोबाइल बदलें</button>
+      <button class="cbtn alt hide" id="testPaid" type="button">टेस्ट: मान लो भुगतान हो गया</button>
+    </section>
+
+    <!-- 3. चंदा रसीद -->
+    <section id="vRcpt" class="hide">
+      <div class="slipwrap" id="rc"></div>
+      <button class="cbtn noprint" id="dl" type="button">रसीद डाउनलोड करें</button>
+      <button class="cbtn alt noprint reset" type="button">फिर से चंदा दें</button>
+    </section>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script>
+    const KEY = 'chanda_user', UPI = 'surjabounsi@jio', PUJA = 'श्री श्री 108 दुर्गा पूजा, नयागाँव';
+    const el = id => document.getElementById(id);
+    const safe = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    let user = null, unsub = null;
+    try { user = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(user)); } catch (e) {} };
+
+    function newReceipt() {
+      const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint8Array(5);
+      crypto.getRandomValues(a);
+      return 'DP' + String(new Date().getFullYear()).slice(2) + '-' + Array.from(a, n => c[n % c.length]).join('');
+    }
+    const toMs = v => v && v.toDate ? v.toDate().getTime() : (v ? new Date(v).getTime() : Date.now());
+    const show = id => ['vForm', 'vPay', 'vRcpt'].forEach(v => el(v).classList.toggle('hide', v !== id));
+
+    function render() {
+      if (unsub) { unsub(); unsub = null; }
+      if (!user) return show('vForm');
+      if (user.status === 'paid') return showReceipt();
+      showPay();
+    }
+
+    function showPay() {
+      show('vPay');
+      el('who').textContent = user.name + ' • ' + user.mobile + (user.amount ? ' • ₹' + user.amount : '');
+      el('ref').textContent = user.receipt;
+      // हर उपयोगकर्ता की रसीद संख्या अलग है, इसलिए उसका QR भी अलग बनता है
+      const link = 'upi://pay?pa=' + UPI + '&pn=' + encodeURIComponent('Durga Puja Nayagaon')
+        + (user.amount ? '&am=' + Number(user.amount).toFixed(2) : '')
+        + '&tn=' + encodeURIComponent('Chanda ' + user.receipt) + '&cu=INR';
+      el('payLink').href = link;
+      el('qr').innerHTML = '';
+      new QRCode(el('qr'), { text: link, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+      unsub = db.collection('chanda').doc(user.receipt).onSnapshot(s => {
+        const d = s.data();
+        if (d && d.status === 'paid') {
+          user = Object.assign({}, user, { status: 'paid', paidAt: toMs(d.paidAt), amount: d.amount || user.amount || null });
+          save(); render();
+        }
+      }, e => console.error(e));
+    }
+
+    function showReceipt() {
+      show('vRcpt');
+      const dt = new Date(user.paidAt || Date.now());
+      const date = dt.toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+        + ', ' + dt.toLocaleTimeString('hi-IN', { hour: 'numeric', minute: '2-digit' });
+      const rows = [['दिनांक', date], ['नाम', user.name], ['मोबाइल', user.mobile]];
+      if (user.amount) rows.push(['राशि', '' + user.amount]);
+      rows.push(['रसीद संख्या', '<span class="rno">' + safe(user.receipt) + '</span>']);
+      el('rc').innerHTML = '<div class="slip"><p class="puja">' + PUJA + ' हेतु चंदा</p>'
+        + '<div class="stamp">✔ चंदा प्राप्त हुआ</div><dl>'
+        + rows.map(r => '<div class="row"><dt>' + r[0] + '</dt><dd>' + (r[0] === 'रसीद संख्या' ? r[1] : safe(r[1])) + '</dd></div>').join('')
+        + '</dl></div>';
+    }
+
+    el('f').onsubmit = e => {
+      e.preventDefault();
+      const name = el('nm').value.trim(), mobile = el('mb').value.replace(/\D/g, '');
+      const err = m => { el('err').textContent = m; };
+      if (name.length < 2) return err('कृपया अपना नाम लिखें।');
+      if (!/^[6-9]\d{9}$/.test(mobile)) return err('कृपया सही 10 अंकों का मोबाइल नंबर लिखें।');
+      err('');
+      const amount = Math.round(Number(el('am').value));
+      if (!(amount >= 1 && amount <= 500000)) return err('कृपया चंदे की राशि लिखें (कम से कम ₹1)।');
+      const receipt = newReceipt();
+      user = { name, mobile, amount, receipt, status: 'pending' };
+      save();   // पहले फोन में सेव, ताकि नेट न होने पर भी डेटा रहे
+      db.collection('chanda').doc(receipt).set({
+        name, mobile, amount, receipt, status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(e => {
+        console.error(e);
+        el('saveErr').textContent = 'रिकॉर्ड सेव नहीं हुआ (' + e.code + ')। एडमिन को यह दिखाई नहीं देगा।';
+      });
+      render();
+    };
+
+    document.querySelectorAll('.reset').forEach(b => b.onclick = () => {
+      el('nm').value = user ? user.name : '';
+      el('mb').value = user ? user.mobile : '';
+      el('am').value = user && user.amount ? user.amount : '';
+      user = null;
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      render();
+    });
+
+    el('dl').onclick = () => {
+      const b = el('dl'); b.disabled = true;
+      html2canvas(el('rc'), { scale: 2, backgroundColor: '#ffffff' }).then(c => {
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = 'chanda-receipt-' + user.receipt + '.png';
+        a.click();
+      }).catch(console.error).then(() => { b.disabled = false; });
+    };
+
+    // टेस्ट मोड: chanda.html?test=1 खोलने पर ही बटन दिखता है (Firestore में कुछ नहीं लिखता)
+    if (/[?&]test=1\b/.test(location.search)) {
+      el('testPaid').classList.remove('hide');
+      el('testPaid').onclick = () => {
+        user = Object.assign({}, user, { status: 'paid', paidAt: Date.now() });
+        save(); render();
+      };
+    }
+
+    render();
+  </script>
+</body>
+</html>

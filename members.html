@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>समिति सदस्य</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body>
+  <nav><div class="wrap">
+    <a href="index.html">मुख्य पृष्ठ</a>
+    
+      <!--Tab to edit-->
+    </div>
+      <!--Tab to edit-->
+    </nav>
+  <main class="wrap">
+    <section id="members"><h2>समिति के सदस्य</h2><div class="grid" id="memberList"></div></section>
+</main>
+
+</body>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+db.collection('members').orderBy('order').get().then(s => {
+  $('memberList').innerHTML = s.docs.map(x => x.data()).map(m => `<div class="card mem">
+    ${m.photo ? `<img class="ph" src="${esc(m.photo)}" alt="${esc(m.name)}" loading="lazy">` : `<div class="ph">${esc((m.name || '').charAt(0))}</div>`}
+    <b>${esc(m.name)}</b><span class="meta">${esc(m.post)}</span>
+    ${m.phone ? `<div><a href="tel:${esc(m.phone)}">${esc(m.phone)}</a></div>` : ''}</div>`).join('')
+    || '<p class="empty">सदस्यों की सूची जल्द ही जोड़ी जाएगी।</p>';
+}).catch(e => {
+  console.error(e);
+  $('memberList').innerHTML = '<p class="empty">जानकारी लोड नहीं हो सकी। कृपया बाद में प्रयास करें।</p>';
+});
+</script>
+</html>

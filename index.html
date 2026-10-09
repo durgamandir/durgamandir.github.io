@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>श्री श्री 108 दुर्गा पूजा समिति, नयागाँव</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Tiro+Devanagari+Hindi&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .day.puja { background: #fdeccb; box-shadow: inset 0 0 0 1.5px #b45309; }
+  .legend b.p { background: #b45309; }
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+<a href="#calendar">पूजा कैलेंडर</a><a href="#meeting">आगामी बैठक</a><a href="members.html">समिति सदस्य</a><a href="chanda.html">चंदा दें</a>
+</div></nav>
+
+<header class="wrap hero" id="home">
+  <div class="frame">
+    <small>॥ जय माँ दुर्गा ॥</small>
+    <h1 id="name">श्री श्री 108 दुर्गा पूजा समिति</h1>
+    <div class="place" id="place">नयागाँव</div>
+    <div class="dates" id="dates"></div>
+    <p><a class="btn" href="chanda.html">🙏 चंदा दें</a></p>
+  </div>
+</header>
+
+<main class="wrap">
+<section id="calendar"><h2>दुर्गा पूजा कैलेंडर</h2><div class="card calbox"><div id="cal"></div><div class="dayinfo" id="dayInfo"></div></div><div id="events"></div></section>
+
+  <section id="meeting"><h2>आगामी बैठक</h2><div id="meetings"></div></section>
+
+</main>
+
+<footer id="contact"><div class="wrap">
+
+  <p id="about"></p>
+  <p id="addr"></p>
+  <p id="secretTap">© श्री श्री 108 दुर्गा पूजा समिति, नयागाँव</p>
+</div></footer>
+<div id="sec" style="display:none;position:fixed;bottom:12px;right:12px;background:#fff;border:1px solid #ccc;border-radius:10px;padding:10px;z-index:99">
+  <a href="admin.html">सदस्य / कार्यक्रम एडमिन</a><br>
+  <a href="chanda-admin.html">चंदा एडमिन</a>
+</div>
+<script>
+(function () {
+  const t = document.getElementById('secretTap'); if (!t) return;
+  let n = 0, last = 0;
+  t.addEventListener('click', () => {
+    const now = Date.now(); n = (now - last < 600) ? n + 1 : 1; last = now;
+    if (n >= 5) { n = 0; const s = document.getElementById('sec'); s.style.display = s.style.display === 'none' ? 'block' : 'none'; }
+  });
+})();
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const t = todayStr();
+let MT = [], EV = [], sel = null, cm = new Date(); cm.setDate(1);
+// दुर्गा पूजा के दिन: [शुरू, अंत]। इन सभी दिनों पर कैलेंडर अपने आप निशान लगाता है।
+// हर साल सिर्फ़ एक लाइन जोड़ें (या Firestore settings/main में pujaStart और pujaEnd लिखें)।
+const PUJA = [['2026-10-11', '2026-10-20']];
+const tms = s => new Date(s + 'T00:00:00').getTime(), DAY = 86400000;
+function pujaDay(k) {
+  for (const [s, e] of PUJA) {
+    const a = tms(s), b = tms(e), x = tms(k);
+    if (x >= a && x <= b) return { n: Math.round((x - a) / DAY) + 1, total: Math.round((b - a) / DAY) + 1 };
+  }
+  return null;
+}
+function showPujaDates() {
+  const nxt = PUJA.filter(p => p[1] >= t).sort()[0];
+  if (!nxt) return false;
+  const f = x => new Date(x + 'T00:00:00').toLocaleDateString('hi-IN', {day:'numeric', month:'long', year:'numeric'});
+  $('dates').textContent = f(nxt[0]) + ' से ' + f(nxt[1]) + ' तक';
+  return true;
+}
+function drawCal() {
+  const y = cm.getFullYear(), m = cm.getMonth(), first = new Date(y, m, 1).getDay(), n = new Date(y, m + 1, 0).getDate();
+  const key = d => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  let h = `<div class="calhead"><button class="btn ghost" id="pm" aria-label="पिछला महीना">‹</button><h3>${cm.toLocaleDateString('hi-IN', {month:'long', year:'numeric'})}</h3><button class="btn ghost" id="nm" aria-label="अगला महीना">›</button></div><div class="calgrid">`
+    + ['रवि','सोम','मंगल','बुध','गुरु','शुक्र','शनि'].map(d => `<div class="dow">${d}</div>`).join('') + '<div></div>'.repeat(first);
+  for (let d = 1; d <= n; d++) {
+    const k = key(d), e = EV.some(x => x.date === k), mt = MT.some(x => x.date === k);
+    h += `<button class="day ${k === t ? 'today' : ''} ${k === sel ? 'sel' : ''} ${pujaDay(k) ? 'puja' : ''}" data-k="${k}">${d}<i>${e ? '<b></b>' : ''}${mt ? '<b class="m"></b>' : ''}</i></button>`;
+  }
+  $('cal').innerHTML = h + '</div><div class="legend"><b></b>कार्यक्रम<b class="m"></b>बैठक<b class="p"></b>दुर्गा पूजा</div>';
+  $('pm').onclick = () => { cm.setMonth(cm.getMonth() - 1); sel = null; drawCal(); };
+  $('nm').onclick = () => { cm.setMonth(cm.getMonth() + 1); sel = null; drawCal(); };
+  document.querySelectorAll('.day').forEach(b => b.onclick = () => { sel = b.dataset.k; drawCal(); });
+  if (!sel) { $('dayInfo').innerHTML = ''; return; }
+  const pd = pujaDay(sel);
+  const items = [...EV.filter(x => x.date === sel).map(x => ({...x, kind:'कार्यक्रम'})), ...MT.filter(x => x.date === sel).map(x => ({...x, kind:'बैठक'}))];
+  $('dayInfo').innerHTML = `<div class="meta" style="margin-bottom:6px">${fmtDate(sel)}</div>` + (pd ? `<div class="card"><b>दुर्गा पूजा महोत्सव</b> <span class="meta">दिन ${pd.n} / ${pd.total}</span></div>` : '') + (items.map(x => `<div class="card"><b>${esc(x.title)}</b> <span class="meta">(${x.kind})</span>
+    <div class="meta">${x.time ? esc(x.time) : ''}${x.place ? ' • ' + esc(x.place) : ''}</div>${(x.desc || x.agenda) ? `<div>${esc(x.desc || x.agenda)}</div>` : ''}</div>`).join('') || (pd ? '' : '<p class="empty">इस दिन कोई कार्यक्रम या बैठक नहीं है।</p>'));
+}
+drawCal();
+showPujaDates();
+const fail = id => $(id).innerHTML = '<p class="empty">जानकारी लोड नहीं हो सकी। कृपया बाद में प्रयास करें।</p>';
+
+db.doc('settings/main').get().then(s => {
+  const d = s.data(); if (!d) return;
+  if (d.name) { $('name').textContent = d.name; document.title = d.name; }
+  if (d.place) $('place').textContent = d.place;
+  if (d.pujaStart && d.pujaEnd) { PUJA.push([d.pujaStart, d.pujaEnd]); drawCal(); }
+  if (!showPujaDates() && d.dates) $('dates').textContent = d.dates;
+  if (d.about) $('about').textContent = d.about;
+  const c = [d.address, d.phone && ('फोन: ' + d.phone)].filter(Boolean).join(' | ');
+  if (c) $('addr').textContent = c;
+}).catch(() => {});
+
+db.collection('meetings').orderBy('date').get().then(s => {
+  MT = s.docs.map(d => d.data()); drawCal();
+  const r = MT.filter(m => m.date >= t);
+  $('meetings').innerHTML = r.map(m => `<div class="card meet"><h3>${esc(m.title)}</h3>
+    <div class="meta">${fmtDate(m.date)}${m.time ? ' • ' + esc(m.time) : ''}${m.place ? ' • ' + esc(m.place) : ''}</div>
+    ${m.agenda ? `<p>${esc(m.agenda)}</p>` : ''}</div>`).join('') || '<p class="empty">अभी कोई बैठक निर्धारित नहीं है।</p>';
+}).catch(() => fail('meetings'));
+
+db.collection('events').orderBy('date').get().then(s => {
+  const r = s.docs.map(d => d.data()); EV = r; drawCal();
+  $('events').innerHTML = r.map(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    return `<div class="card ev ${e.date < t ? 'past' : ''}">
+      <div class="badge"><b>${d.getDate()}</b><span>${d.toLocaleDateString('hi-IN', {month:'short'})}</span></div>
+      <div><h3>${esc(e.title)}</h3><div class="meta">${fmtDate(e.date)}${e.time ? ' • ' + esc(e.time) : ''}</div>
+      ${e.desc ? `<p>${esc(e.desc)}</p>` : ''}</div></div>`;
+  }).join('') || '<p class="empty">कार्यक्रमों की सूची जल्द ही जोड़ी जाएगी।</p>';
+}).catch(() => fail('events'));
+
+</script>
+</body>
+</html>
